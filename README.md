@@ -1,4 +1,3 @@
- "Powered by DartNode - Free VPS for Open Source")
 <div align="center">
   <h1><b>Sublink Worker</b></h1>
   <h5><i>Best Practice for Serverless Self-Deployed Subscription Conversion Tool</i></h5>
@@ -141,4 +140,4 @@ Thanks to everyone who has starred this project! 🌟
    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=7Sageer/sublink-worker&type=Date" />
  </picture>
 </a>
-[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com
+[![Powered by DartNode](https://dartnode.com/branding/DN-Open-Source-sm.png)](https://dartnode.com "Powered by DartNode - Free VPS for Open Source")
