@@ -16,7 +16,7 @@ import { ShortLinkService } from '../services/shortLinkService.js';
 import { ConfigStorageService } from '../services/configStorageService.js';
 import { ServiceError, MissingDependencyError } from '../services/errors.js';
 import { normalizeRuntime } from '../runtime/runtimeConfig.js';
-import { PREDEFINED_RULE_SETS, SING_BOX_CONFIG, SING_BOX_CONFIG_V1_11 } from '../config/index.js';
+import { PREDEFINED_RULE_SETS, SING_BOX_CONFIG, SING_BOX_CONFIG_V1_11, generateSubconverterConfig } from '../config/index.js';
 
 const DEFAULT_USER_AGENT = 'curl/7.74.0';
 
@@ -57,7 +57,7 @@ export function createApp(bindings = {}) {
                                         {subtitle}
                                     </p>
                                 </div>
-                                <Form t={t} />
+                                <Form t={t} lang={lang} />
                             </div>
                         </div>
                     </main>
@@ -77,7 +77,7 @@ export function createApp(bindings = {}) {
 
             const selectedRules = parseSelectedRules(c.req.query('selectedRules'));
             const customRules = parseJsonArray(c.req.query('customRules'));
-            const ua = c.req.query('ua') || DEFAULT_USER_AGENT;
+            const ua = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
             const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
             const enableClashUI = parseBooleanFlag(c.req.query('enable_clash_ui'));
@@ -129,7 +129,7 @@ export function createApp(bindings = {}) {
 
             const selectedRules = parseSelectedRules(c.req.query('selectedRules'));
             const customRules = parseJsonArray(c.req.query('customRules'));
-            const ua = c.req.query('ua') || DEFAULT_USER_AGENT;
+            const ua = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
             const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
             const enableClashUI = parseBooleanFlag(c.req.query('enable_clash_ui'));
@@ -175,7 +175,7 @@ export function createApp(bindings = {}) {
 
             const selectedRules = parseSelectedRules(c.req.query('selectedRules'));
             const customRules = parseJsonArray(c.req.query('customRules'));
-            const ua = c.req.query('ua') || DEFAULT_USER_AGENT;
+            const ua = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
             const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
             const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
             const configId = c.req.query('configId');
@@ -207,6 +207,47 @@ export function createApp(bindings = {}) {
         }
     });
 
+    app.get('/subconverter', (c) => {
+        try {
+            const rawSelectedRules = c.req.query('selectedRules');
+            let selectedRules;
+
+            if (!rawSelectedRules) {
+                selectedRules = PREDEFINED_RULE_SETS.balanced;
+            } else if (PREDEFINED_RULE_SETS[rawSelectedRules]) {
+                selectedRules = PREDEFINED_RULE_SETS[rawSelectedRules];
+            } else {
+                try {
+                    const parsed = JSON.parse(rawSelectedRules);
+                    if (Array.isArray(parsed)) {
+                        selectedRules = parsed;
+                    } else {
+                        return c.text('Invalid selectedRules: must be a preset name (minimal, balanced, comprehensive) or a JSON array', 400);
+                    }
+                } catch {
+                    return c.text(`Invalid selectedRules: "${rawSelectedRules}" is not a valid preset name or JSON array. Valid presets: minimal, balanced, comprehensive`, 400);
+                }
+            }
+
+            const includeAutoSelect = c.req.query('include_auto_select') !== 'false';
+            const groupByCountry = parseBooleanFlag(c.req.query('group_by_country'));
+            const lang = c.get('lang');
+
+            const config = generateSubconverterConfig({
+                selectedRules,
+                lang,
+                includeAutoSelect,
+                groupByCountry
+            });
+
+            return c.text(config, 200, {
+                'Content-Type': 'text/plain; charset=utf-8'
+            });
+        } catch (error) {
+            return handleError(c, error, runtime.logger);
+        }
+    });
+
     app.get('/xray', async (c) => {
         const inputString = c.req.query('config');
         if (!inputString) {
@@ -215,7 +256,7 @@ export function createApp(bindings = {}) {
 
         const proxylist = inputString.split('\n');
         const finalProxyList = [];
-        const userAgent = c.req.query('ua') || DEFAULT_USER_AGENT;
+        const userAgent = c.req.query('ua') || getRequestHeader(c.req, 'User-Agent') || DEFAULT_USER_AGENT;
         const headers = { 'User-Agent': userAgent };
 
         for (const proxy of proxylist) {

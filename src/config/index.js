@@ -18,6 +18,7 @@ export {
 	CUSTOM_RULES,
 	UNIFIED_RULES,
 	PREDEFINED_RULE_SETS,
+	DIRECT_DEFAULT_RULES,
 	SITE_RULE_SETS,
 	IP_RULE_SETS,
 	CLASH_SITE_RULE_SETS,
@@ -31,6 +32,9 @@ export {
 	generateRuleSets,
 	generateClashRuleSets
 } from './ruleGenerators.js';
+
+// Subconverter Config
+export { generateSubconverterConfig } from './subconverterConfig.js';
 
 // Platform Configs
 export { SING_BOX_CONFIG, SING_BOX_CONFIG_V1_11 } from './singboxConfig.js';
