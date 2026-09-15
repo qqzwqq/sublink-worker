@@ -7,6 +7,11 @@ import { buildSelectorMembers as buildSelectorMemberList, buildNodeSelectMembers
 import { normalizeGroupName } from './helpers/groupNameUtils.js';
 
 const RULE_SET_HTTP_CLIENT_TAG = 'rule-set-download';
+const ANYTLS_OPTION_KEYS = {
+    'idle-session-check-interval': 'idle_session_check_interval',
+    'idle-session-timeout': 'idle_session_timeout',
+    'min-idle-session': 'min_idle_session'
+};
 
 export class SingboxConfigBuilder extends BaseConfigBuilder {
     constructor(inputString, selectedRules, customRules, baseConfig, lang, userAgent, groupByCountry = false, enableClashUI = false, externalController, externalUiDownloadUrl, singboxVersion = '1.12', includeAutoSelect = true) {
@@ -100,6 +105,24 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         // Create a shallow copy to avoid mutating the original
         const sanitized = { ...proxy };
 
+        // URI and Clash inputs use Mihomo's kebab-case names, while sing-box
+        // rejects those keys and requires its native snake_case options.
+        if (sanitized.type === 'anytls') {
+            Object.entries(ANYTLS_OPTION_KEYS).forEach(([sourceKey, targetKey]) => {
+                if (sanitized[sourceKey] !== undefined && sanitized[targetKey] === undefined) {
+                    sanitized[targetKey] = sanitized[sourceKey];
+                }
+                delete sanitized[sourceKey];
+            });
+            // sing-box types the two idle intervals as Duration strings ("30s"),
+            // while share links and Mihomo carry plain seconds
+            ['idle_session_check_interval', 'idle_session_timeout'].forEach((key) => {
+                if (typeof sanitized[key] === 'number') {
+                    sanitized[key] = `${sanitized[key]}s`;
+                }
+            });
+        }
+
         // Strip Clash-only / mis-typed fields that conflict with sing-box semantics.
         // `udp` is Clash-only. Top-level `network` in sing-box is a TCP/UDP allowlist
         // (NetworkList in option/types.go); a stray "tcp" silently disables UDP for
@@ -123,6 +146,34 @@ export class SingboxConfigBuilder extends BaseConfigBuilder {
         // Remove packet_encoding for now - it's version-specific in sing-box
         // xudp is default in newer versions
         delete sanitized.packet_encoding;
+
+        if (sanitized.type === 'hysteria2') {
+            // sing-box names port-hopping/bandwidth fields differently from the
+            // share-link shape, and rejects unknown fields outright
+            if (sanitized.ports) {
+                const ranges = String(sanitized.ports).split(',')
+                    .map(range => range.trim().replace('-', ':'))
+                    .filter(Boolean);
+                if (ranges.length > 0) {
+                    sanitized.server_ports = ranges;
+                }
+                delete sanitized.ports;
+            }
+            if (typeof sanitized.hop_interval === 'number') {
+                sanitized.hop_interval = `${sanitized.hop_interval}s`;
+            }
+            if (sanitized.up !== undefined) {
+                sanitized.up_mbps = sanitized.up;
+                delete sanitized.up;
+            }
+            if (sanitized.down !== undefined) {
+                sanitized.down_mbps = sanitized.down;
+                delete sanitized.down;
+            }
+            delete sanitized.auth;
+            delete sanitized.recv_window_conn;
+            delete sanitized.fast_open;
+        }
 
         return sanitized;
     }
